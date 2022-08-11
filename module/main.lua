@@ -36,7 +36,18 @@ do -- Client Functions
     end
 
     function SynDiscord.Client:login(token)
-        self.User = { Token = token }
+        local BOT_RES = SynDiscord.Utils:JSONDecode(syn.request({
+            Url = 'https://discord.com/api/v9/users/@me',
+            Headers = {
+                Authorization = 'Bot ' .. token
+            }
+        }).Body)
+        if BOT_RES.bot == true then
+            self.User = { Token = 'Bot ' .. token }
+        else
+            self.User = { Token = token }
+        end
+        
         self.__meta__.WebsocketClient:Send(SynDiscord.Utils:JSONEncode({
             op = 2,
             d = {
