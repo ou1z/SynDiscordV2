@@ -6,7 +6,7 @@ local SynDiscord = {
     Client = {},
     Utils = {},
     Embeds = {},
-    WEBSOCKET_SERVER = string.format('wss://gateway.discord.gg/?v=6&encoding=json'),
+    WEBSOCKET_SERVER = string.format('wss://gateway.discord.gg/?v=10&encoding=json'),
     API_ROOT = "https://discord.com/api/v9/"
 }
 
@@ -15,9 +15,11 @@ do -- Client Functions
 
     function SynDiscord.Client.new()
         local Client = setmetatable({}, SynDiscord.Client)
+        local WS_Client = syn.websocket.connect(SynDiscord.WEBSOCKET_SERVER)
         Client.__meta__ = {
             EventListeners = {};
-            WebsocketClient = syn.websocket.connect(SynDiscord.WEBSOCKET_SERVER);
+            WebsocketClient = WS_Client,
+            HEARTBEAT_INTERVAL = 41250
         }
         Client:StartEventLoop()
         return Client
@@ -48,6 +50,8 @@ do -- Client Functions
             self.User = { Token = token }
         end
         
+
+
         self.__meta__.WebsocketClient:Send(SynDiscord.Utils:JSONEncode({
             op = 2,
             d = {
@@ -78,6 +82,10 @@ do -- Client Functions
 
         client.OnMessage:Connect(function(data)
             local parsed = SynDiscord.Utils:JSONDecode(data)
+
+            if parsed.op == 10 then
+                self.__meta__.HEARTBEAT_INTERVAL = parsed.d.heartbeat_interval
+            end
 
             if parsed.t then
                 local Event = SynDiscord.Utils:SnakeToCamelCase(parsed.t:lower())
@@ -194,10 +202,12 @@ do -- Client Functions
         end)
 
         task.spawn(function() -- needed to keep the websocket client alive. so it doesnt just shut down after 30 seconds or so
-            while task.wait(5) do
+            repeat task.wait() until self.__meta__.HEARTBEAT_INTERVAL
+            local rand = Random.new()
+            while true do
+                task.wait((self.__meta__.HEARTBEAT_INTERVAL*rand:NextNumber())/1000)
                 client:Send(SynDiscord.Utils:JSONEncode({
-                    op = 1,
-                    d = 251
+                    op = 1
                 }))
             end
         end)
